@@ -1,16 +1,75 @@
+#Renata Vinhaga dos Anjos 10295263
 import numpy as np 
-#import matplotlib.pyplot as pt 
 import imageio
+
+
+def E(x, y):
+	return np.sqrt(x*x + y*y)
+
+def G(x, Sigma):
+	return (np.exp(-(x * x)/(2 * Sigma * Sigma))/(2 * np.pi * Sigma * Sigma))
+
+def padding(m, add):
+	return np.pad(m, [(add, add), (add, add)], mode='constant', constant_values=0)
+
+def unpadding(m, sub):
+	return m[sub:m.shape[0]-sub, sub:m.shape[1]-sub]
 
 def compare(m, r):
 	return np.sqrt(np.sum((m - r)**2))
+
+def Spatial_Gaussian(SigmaS, n):
+	a = -int((n-1)/2)
+	b = int((n-1)/2)
+	Gs = np.zeros((n,n))
+	for x in range(a,b + 1):
+		for y in range(a,b + 1):
+			Gs[x-a][y-a] = G(E(x,y), SigmaS)
+
+	return Gs
+
+def Range_Gaussian(m, SigmaR, n):
+	a = -int((n-1)/2)
+	b = int((n-1)/2)
+	center = m[b][b]
+	Gs = np.zeros((n,n))
+	for x in range(0,n):
+		for y in range(0, n):
+			Gs[x][y] = G(m[x][y] - center, SigmaR) 
+	return Gs
+
+def method1(I, n, SigmaS, SigmaR):
+	N,M = I.shape #dimension of f
+	Wp = np.zeros((n,n))
+	a = int((n-1)/2)
+	b = int((n-1)/2)
+	I = padding(I, a)
+	If = np.zeros(I.shape)
+	Gs = Spatial_Gaussian(SigmaS, n)
+	print(Gs)
+	W = 0
+	for x in range(a, N+1):
+		for y in range(b, M+1):
+			region_f = I[x-a : x + (a+1), y-b : y+(b+1)]
+			Gr = Range_Gaussian(region_f, SigmaR, n)
+			Wp = Gr * Gs
+			W = np.sum(Wp)
+			If[x,y] = np.sum(np.multiply(Wp, region_f))
+			If[x,y] = If[x,y]/W
+			
+
+	I = unpadding(I, a)
+	If = unpadding(If, a)
+
+	return If
+
 
 def method2(f, kernel, c):
 	N,M = f.shape #dimension of f
 	n,m = 3,3
 	a = int((n-1)/2)
 	b = int((n-1)/2)
-	f = np.pad(f, [(1, 1), (1, 1)], mode='constant', constant_values=0)
+	f = padding(f)
 	I = np.zeros(f.shape)
     
 	if kernel == 1:
@@ -20,49 +79,52 @@ def method2(f, kernel, c):
 	
 	for x in range(a, N+1):
 		for y in range(b, M+1):
-			region_f = f[ x-a : x + (a+1), y-b : y+(b+1) ]
+			region_f = f[x-a : x + (a+1), y-b : y+(b+1)]
 			I[x,y] = np.sum(np.multiply(k, region_f))
 
-	f = f[1:f.shape[0]-1, 1:f.shape[1]-1]	
-	I = I[1:I.shape[0]-1, 1:I.shape[1]-1]	
+	f = unpadding(f)
+	I = unpadding(I)	
 
 	min_I = I.min()
 	max_I = I.max()
 	I = ((I - min_I) * 255)/(max_I)
 	r = c * I + f
-	return ((r - r.min()) * 255)/(r.max())
+	return ((r - r.min()) * 255)/(r.max() - r.min())
 
-filename = str(input()).rstrip()
-m = imageio.imread("imgs/" + filename)
-method = int(input())
-save = int(input())
+def main():
+	filename = str(input()).rstrip()
+	m = imageio.imread("imgs/" + filename)
+	method = int(input())
+	save = int(input())
+	
+	m = np.asarray(m, dtype = float)
 
-m = np.asarray(m, dtype = float)
+	if method == 1:
+		n = int(input())
+		s = float(input())
+		r = float(input())
+		output_img = method1(m, n, s, r)
 
-if method == 1:
-	n = int(input())
-	s = float(input())
-	r = float(input())
-if method == 2:
-	# m = np.matrix([[23,    5,  39,  45,  50],
-	#                [70,   88,  12, 100, 110],
-	#                [130, 145, 159, 136, 137],
-	#                [19,  200, 201, 220, 203],
-	#                [25,   26,  27,  28, 209],
-	#                [131,  32, 133,  34, 135]])
-	c = float(input())
-	kernel = int(input())
-	r = method2(m, kernel, c)
+	if method == 2:
+		c = float(input())
+		kernel = int(input())
+		output_img = method2(m, kernel, c)
 
-if method == 3:
-	kernel = int(input())
-	row = int(input())
-	col = int(input())
+	if method == 3:
+		kernel = int(input())
+		row = int(input())
+		col = int(input())
+		output_img = method3()
 
-output_img = r
-print("{:.4f}".format(compare(m,r)))
+	print(m.shape)
+	print(output_img.shape)
+	print("{:.4f}".format(compare(m,output_img)))
 
-output_img = np.asarray(output_img, dtype="uint8")
+	output_img = np.asarray(output_img, dtype="uint8")
 
-if save == 1:
-	imageio.imwrite('output_img.png', output_img)
+	if save == 1:
+		imageio.imwrite('output_img.png', output_img)
+
+
+if __name__ == "__main__":
+	main()
